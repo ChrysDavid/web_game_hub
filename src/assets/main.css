@@ -1,0 +1,31 @@
+:root {
+  --color-bg: #14121a;
+  --color-bg-alt: #1c1926;
+  --color-text: #f2eef7;
+  --color-text-muted: #9c96ab;
+  --color-primary: #e2447b;
+  --color-primary-light: #ff7aa8;
+  --color-accent: #7a5cff;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
