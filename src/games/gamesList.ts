@@ -18,6 +18,22 @@ export const gamesList: GameMeta[] = [
     category: 'couple', // ou 'orientation' selon comment tu veux le classer
     route: '/jeux/ludo',
   },
+  {
+    id: 'pioche',
+    title: 'Pioche',
+    thumbnail: '/thumbnails/pioche.jpg',
+    type: '2D',
+    category: 'couple',
+    route: '/jeux/pioche',
+  },
+  {
+    id: 'refuge',
+    title: 'Notre Refuge',
+    thumbnail: '/thumbnails/refuge.jpg',
+    type: '2D',
+    category: 'couple',
+    route: '/jeux/refuge',
+  },
 ]
 
 export const categoryLabels: Record<GameCategory, string> = {

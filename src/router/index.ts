@@ -14,6 +14,16 @@ const router = createRouter({
       name: 'ludo',
       component: () => import('../views/games/LudoView.vue'),
     },
+    {
+      path: '/jeux/pioche',
+      name: 'pioche',
+      component: () => import('../views/games/PiocheView.vue'),
+    },
+    {
+      path: '/jeux/refuge',
+      name: 'refuge',
+      component: () => import('../views/games/RefugeView.vue'),
+    },
   ],
 })
 
