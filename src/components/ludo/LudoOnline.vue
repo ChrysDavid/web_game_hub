@@ -3,8 +3,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { COLOR_HEX, COLOR_LABEL, type PlayerColor } from '@/games/ludo/constants'
 import { createOnlineLudoGame } from '@/games/ludo/online'
 import { notifyApp, type AppSession } from '@/services/appLink'
-import LudoBoard from './LudoBoard.vue'
-import LudoDice from './LudoDice.vue'
+import LudoTable from './LudoTable.vue'
 
 /** Partie en ligne entre 2 et 4 vraies personnes, uniquement quand le jeu est ouvert depuis l'app. */
 const props = defineProps<{ session: AppSession }>()
@@ -15,14 +14,16 @@ const s = game.state
 onMounted(() => game.start())
 onBeforeUnmount(() => game.leave())
 
+// Pseudo envoye par le serveur (jamais le vrai nom) ; "Toi" pour soi-meme.
 function label(c: PlayerColor) {
-  return c === s.myColor ? `${COLOR_LABEL[c]} (toi)` : COLOR_LABEL[c]
+  if (c === s.myColor) return 'Toi'
+  return s.names[c] ?? `Joueur ${COLOR_LABEL[c]}`
 }
 
 const statusText = computed(() => {
   if (s.message) return s.message
   if (s.awaitingChoice && game.isMyTurn.value) return 'Touche un pion en surbrillance'
-  return game.isMyTurn.value ? 'À toi de jouer' : `Tour de ${COLOR_LABEL[game.current.value]}`
+  return game.isMyTurn.value ? 'À toi de jouer : touche ton dé' : `Tour de ${label(game.current.value)}`
 })
 
 const lobbyText = computed(() => {
@@ -66,35 +67,14 @@ function quit() {
     </div>
 
     <div v-else class="playing">
-      <div class="players-strip">
-        <div
-          v-for="c in s.players"
-          :key="c"
-          class="player-chip"
-          :class="{ active: game.current.value === c, gone: s.abandoned.includes(c) }"
-          :style="{ '--c': COLOR_HEX[c] }"
-        >
-          <span class="dot" />
-          {{ label(c) }} · {{ game.homeCount(c) }}/4
-        </div>
-      </div>
-
-      <div class="board-wrap">
-        <LudoBoard :game="game" />
-      </div>
-
-      <div class="control-bar">
-        <div class="turn-info" :style="{ color: COLOR_HEX[game.current.value] }">
-          <strong>{{ label(game.current.value) }}</strong>
-          <span class="msg">{{ statusText }}</span>
-          <span v-if="s.secondsLeft != null && s.phase === 'playing'" class="msg timer">
-            {{ s.secondsLeft }} s
-          </span>
-        </div>
-        <button class="dice-btn" :disabled="!game.canRoll.value" @click="game.rollDice()">
-          <LudoDice :value="s.dice" :rolling="s.rolling" :accent="COLOR_HEX[game.current.value]" />
-        </button>
-      </div>
+      <LudoTable
+        :game="game"
+        :viewer="s.myColor ?? 'red'"
+        :name-of="label"
+        :status-text="statusText"
+        :seconds-left="s.phase === 'playing' ? s.secondsLeft : null"
+        :turn-seconds="s.turnSeconds"
+      />
 
       <div v-if="game.gameOver.value" class="result-overlay">
         <div class="result-card">
@@ -190,94 +170,7 @@ function quit() {
 }
 
 .playing {
-  max-width: 560px;
   width: 100%;
-}
-
-.players-strip {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 18px;
-}
-
-.player-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: clamp(10px, 2.6vw, 12px);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-}
-
-.player-chip.active {
-  color: white;
-  border-color: var(--c);
-  background: color-mix(in srgb, var(--c) 20%, transparent);
-}
-
-.player-chip.gone {
-  opacity: 0.4;
-  text-decoration: line-through;
-}
-
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--c);
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-.board-wrap {
-  width: 100%;
-  max-width: min(560px, 92vw);
-  margin: 0 auto;
-}
-
-.control-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 20px;
-  flex-wrap: wrap;
-}
-
-.turn-info {
-  display: flex;
-  flex-direction: column;
-  font-size: clamp(14px, 3.6vw, 16px);
-  min-width: 0;
-}
-
-.msg {
-  color: var(--color-text-muted);
-  font-size: clamp(11px, 3vw, 13px);
-  font-weight: 400;
-}
-
-.timer {
-  font-variant-numeric: tabular-nums;
-}
-
-.dice-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.dice-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .result-overlay {
@@ -323,15 +216,4 @@ function quit() {
   margin-top: 0;
 }
 
-@media (max-width: 420px) {
-  .control-bar {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
-  }
-
-  .dice-btn {
-    align-self: center;
-  }
-}
 </style>

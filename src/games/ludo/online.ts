@@ -21,6 +21,7 @@ interface ServerGame {
   ranking: PlayerColor[]
   abandoned: PlayerColor[]
   message: string
+  names?: Partial<Record<PlayerColor, string>>
 }
 
 interface ServerEvent {
@@ -68,6 +69,7 @@ export function createOnlineLudoGame(session: AppSession) {
     maxPlayers: 4,
     startsIn: null as number | null,
     secondsLeft: null as number | null,
+    turnSeconds: 30,
     error: '',
     players: [] as PlayerColor[],
     tokens: [] as Token[],
@@ -80,6 +82,7 @@ export function createOnlineLudoGame(session: AppSession) {
     message: '',
     ranking: [] as PlayerColor[],
     abandoned: [] as PlayerColor[],
+    names: {} as Partial<Record<PlayerColor, string>>,
   })
 
   const current = computed<PlayerColor>(() => state.players[state.turn] ?? 'red')
@@ -185,6 +188,7 @@ export function createOnlineLudoGame(session: AppSession) {
     state.ranking = game.ranking
     state.abandoned = game.abandoned
     state.message = game.message
+    if (game.names) state.names = game.names
   }
 
   async function animateRoll(value: number) {
@@ -224,6 +228,7 @@ export function createOnlineLudoGame(session: AppSession) {
     state.minPlayers = update.min_players
     state.maxPlayers = update.max_players
     state.startsIn = update.starts_in
+    state.turnSeconds = update.turn_seconds
 
     if (update.game && state.players.length === 0) syncGame(update.game)
     for (const event of update.events) {

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, shallowRef, onBeforeUnmount } from 'vue'
 import { ALL_COLORS, COLOR_HEX, COLOR_LABEL, type PlayerColor } from '@/games/ludo/constants'
 import { createLudoGame, type LudoGame } from '@/games/ludo/engine'
-import LudoBoard from '@/components/ludo/LudoBoard.vue'
-import LudoDice from '@/components/ludo/LudoDice.vue'
 import LudoOnline from '@/components/ludo/LudoOnline.vue'
+import LudoTable from '@/components/ludo/LudoTable.vue'
 import { getAppSession } from '@/services/appLink'
 
 // Ouvert depuis l'app (ticket dans l'URL) : partie entre vraies personnes.
@@ -29,23 +28,41 @@ function toggleHuman(c: PlayerColor) {
   }
 }
 
-let game: LudoGame | null = null
+const game = shallowRef<LudoGame | null>(null)
+
+// Le plateau est vu depuis le premier joueur humain (sa couleur en bas a gauche).
+const viewer = computed<PlayerColor>(
+  () => selectedPlayers.value.find((c) => humans.value.has(c)) ?? 'red',
+)
+
+function nameOf(c: PlayerColor) {
+  if (game.value?.isBot(c)) return `Ordi ${COLOR_LABEL[c]}`
+  return humans.value.size === 1 ? 'Toi' : `Joueur ${COLOR_LABEL[c]}`
+}
+
+const statusText = computed(() => {
+  const g = game.value
+  if (!g) return ''
+  if (g.state.message) return g.state.message
+  if (g.state.awaitingChoice) return 'Touche un pion en surbrillance'
+  return g.isBot(g.current.value) ? `Tour de ${nameOf(g.current.value)}` : 'À toi : touche ton dé'
+})
 
 function startGame() {
   const players = selectedPlayers.value
   const bots = players.filter((c) => !humans.value.has(c))
-  game = createLudoGame(players, bots)
+  game.value = createLudoGame(players, bots)
   phase.value = 'playing'
-  game.start()
+  game.value.start()
 }
 
 function restart() {
-  game = null
+  game.value = null
   phase.value = 'setup'
 }
 
 onBeforeUnmount(() => {
-  game = null
+  game.value = null
 })
 </script>
 
@@ -81,50 +98,14 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else-if="game" class="playing">
-      <div class="players-strip">
-        <div
-          v-for="c in game.state.players"
-          :key="c"
-          class="player-chip"
-          :class="{ active: game.current.value === c }"
-          :style="{ '--c': COLOR_HEX[c] }"
-        >
-          <span class="dot" />
-          {{ COLOR_LABEL[c] }} · {{ game.homeCount(c) }}/4
-        </div>
-      </div>
-
-      <div class="board-wrap">
-        <LudoBoard :game="game" />
-      </div>
-
-      <div class="control-bar">
-        <div class="turn-info" :style="{ color: COLOR_HEX[game.current.value] }">
-          <strong>{{ COLOR_LABEL[game.current.value] }}</strong>
-          <span class="msg">{{
-            game.state.message ||
-            (game.state.awaitingChoice
-              ? 'Touche un pion en surbrillance'
-              : game.isBot(game.current.value)
-                ? "Tour de l'ordinateur"
-                : 'À toi de jouer')
-          }}</span>
-        </div>
-        <button class="dice-btn" :disabled="!game.canRoll.value" @click="game.rollDice()">
-          <LudoDice
-            :value="game.state.dice"
-            :rolling="game.state.rolling"
-            :accent="COLOR_HEX[game.current.value]"
-          />
-        </button>
-      </div>
+      <LudoTable :game="game" :viewer="viewer" :name-of="nameOf" :status-text="statusText" />
 
       <div v-if="game.gameOver.value" class="result-overlay">
         <div class="result-card">
           <h2>Classement</h2>
           <ol>
             <li v-for="c in game.state.ranking" :key="c" :style="{ color: COLOR_HEX[c] }">
-              {{ COLOR_LABEL[c] }}
+              {{ nameOf(c) }}
             </li>
           </ol>
           <button @click="restart">Rejouer</button>
@@ -135,11 +116,33 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* Fond de page : nuit profonde avec halos rose/violet/or et un motif discret de points de de. */
 .ludo-page {
+  position: relative;
   min-height: 100vh;
-  padding: clamp(16px, 4vw, 32px) clamp(12px, 4vw, 20px) 60px;
+  min-height: 100dvh;
+  padding: clamp(10px, 3vw, 28px) 8px 24px;
   display: flex;
   justify-content: center;
+  align-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(226, 68, 123, 0.32), transparent 42%),
+    radial-gradient(circle at 88% 92%, rgba(122, 92, 255, 0.3), transparent 45%),
+    radial-gradient(circle at 85% 12%, rgba(233, 176, 44, 0.14), transparent 35%),
+    radial-gradient(circle at 10% 88%, rgba(46, 158, 87, 0.12), transparent 35%),
+    linear-gradient(160deg, #1d1629 0%, #120e1a 55%, #0b0910 100%);
+}
+
+.ludo-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.5'%3E%3Crect x='8' y='8' width='22' height='22' rx='5'/%3E%3Crect x='44' y='42' width='20' height='20' rx='5' transform='rotate(15 54 52)'/%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Ccircle cx='14' cy='14' r='2'/%3E%3Ccircle cx='19' cy='19' r='2'/%3E%3Ccircle cx='24' cy='24' r='2'/%3E%3Ccircle cx='50' cy='48' r='1.8'/%3E%3Ccircle cx='58' cy='56' r='1.8'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 72px 72px;
+  pointer-events: none;
 }
 
 .setup {
@@ -232,81 +235,13 @@ onBeforeUnmount(() => {
 }
 
 .playing {
-  max-width: 560px;
   width: 100%;
-}
-
-.players-strip {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 18px;
-}
-
-.player-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: clamp(10px, 2.6vw, 12px);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-}
-
-.player-chip.active {
-  color: white;
-  border-color: var(--c);
-  background: color-mix(in srgb, var(--c) 20%, transparent);
-}
-
-.board-wrap {
-  width: 100%;
-  max-width: min(560px, 92vw);
-  margin: 0 auto;
-}
-
-.control-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 20px;
-  flex-wrap: wrap;
-}
-
-.turn-info {
-  display: flex;
-  flex-direction: column;
-  font-size: clamp(14px, 3.6vw, 16px);
-  min-width: 0;
-}
-
-.msg {
-  color: var(--color-text-muted);
-  font-size: clamp(11px, 3vw, 13px);
-  font-weight: 400;
-}
-
-.dice-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.dice-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .result-overlay {
   position: fixed;
   inset: 0;
+  z-index: 50;
   background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
@@ -319,7 +254,6 @@ onBeforeUnmount(() => {
   padding: 30px;
   border-radius: 18px;
   text-align: center;
-  min-width: 260px;
   width: 100%;
   max-width: 340px;
 }
@@ -340,19 +274,5 @@ onBeforeUnmount(() => {
   font-weight: 700;
   cursor: pointer;
   min-height: 44px;
-}
-
-/* petits ecrans : la barre de controle passe en colonne pour eviter
-   que le message soit ecrase contre le de */
-@media (max-width: 420px) {
-  .control-bar {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
-  }
-
-  .dice-btn {
-    align-self: center;
-  }
 }
 </style>

@@ -127,3 +127,4 @@ composants.
   via le backend `vidolove_backend` (voir `vidolove_backend/docs/GAMES.md`).
 - Ludo : `src/games/ludo/online.ts` (client en ligne) et `src/components/ludo/LudoOnline.vue`.
 - Le serveur Vite ecoute sur le reseau local (`server.host: true`) pour que le telephone y accede.
+- Interface commune `src/components/ludo/LudoTable.vue` : plateau tourne pour que ta couleur soit en bas a gauche, un poste par joueur a son coin (pseudo, chrono, de qui roule chez le joueur qui joue).

@@ -77,14 +77,14 @@ export function trackIndex(color: PlayerColor, step: number): number {
 /** Centre du pion en unites de case : [col, row]. */
 export function centerOf(color: PlayerColor, step: number, tokenId: number): [number, number] {
   if (step < 0) {
-    const [r, c] = YARD_SLOTS[color][tokenId]
+    const [r, c] = YARD_SLOTS[color][tokenId]!
     return [c, r]
   }
   if (step <= LAST_TRACK_STEP) {
-    const [r, c] = TRACK[trackIndex(color, step)]
+    const [r, c] = TRACK[trackIndex(color, step)]!
     return [c + 0.5, r + 0.5]
   }
-  const [r, c] = HOME_PATH[color][step - LAST_TRACK_STEP - 1]
+  const [r, c] = HOME_PATH[color][step - LAST_TRACK_STEP - 1]!
   return [c + 0.5, r + 0.5]
 }
 

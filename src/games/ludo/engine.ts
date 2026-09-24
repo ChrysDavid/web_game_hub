@@ -1,6 +1,6 @@
 import { reactive, computed } from 'vue'
 import type { PlayerColor } from './constants'
-import { LAST_TRACK_STEP, MAX_STEP, SAFE_INDICES, trackIndex } from './constants'
+import { COLOR_LABEL, LAST_TRACK_STEP, MAX_STEP, SAFE_INDICES, trackIndex } from './constants'
 
 export interface Token {
   color: PlayerColor
@@ -30,7 +30,7 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
     ranking: [] as PlayerColor[],
   })
 
-  const current = computed(() => state.players[state.turnIndex])
+  const current = computed(() => state.players[state.turnIndex]!)
   const isBotTurn = computed(() => botSet.has(current.value))
   const gameOver = computed(() => state.ranking.length >= state.players.length - 1)
   const canRoll = computed(
@@ -82,13 +82,13 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
         captured = true
       }
     }
-    if (captured) state.message = `Capture ! ${current.value} rejoue`
+    if (captured) state.message = `Capture ! ${COLOR_LABEL[current.value]} rejoue`
     return captured
   }
 
   function botPick(moves: Token[]): Token {
     const d = state.dice!
-    let best = moves[0]
+    let best = moves[0]!
     let bestScore = -Infinity
 
     for (const t of moves) {
@@ -131,7 +131,7 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
     state.sixStreak = 0
     for (let i = 1; i <= state.players.length; i++) {
       const idx = (state.turnIndex + i) % state.players.length
-      if (!hasFinished(state.players[idx])) {
+      if (!hasFinished(state.players[idx]!)) {
         state.turnIndex = idx
         break
       }
@@ -143,7 +143,7 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
   function sameTurn() {
     state.dice = null
     state.awaitingChoice = false
-    if (!state.message) state.message = `${current.value} rejoue`
+    if (!state.message) state.message = `${COLOR_LABEL[current.value]} rejoue`
     scheduleBot()
   }
 
@@ -177,11 +177,11 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
     if (captured) await wait(420)
 
     const reachedHome = t.step === MAX_STEP
-    if (reachedHome) state.message = `${t.color} rentre un pion`
+    if (reachedHome) state.message = `${COLOR_LABEL[t.color]} rentre un pion`
 
     if (hasFinished(t.color) && !state.ranking.includes(t.color)) {
       state.ranking.push(t.color)
-      state.message = `${t.color} a rentré ses 4 pions`
+      state.message = `${COLOR_LABEL[t.color]} a rentré ses 4 pions`
     }
 
     state.moving = false
@@ -233,7 +233,7 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
 
     if (moves.length === 1) {
       await wait(280)
-      await playToken(moves[0])
+      await playToken(moves[0]!)
       return
     }
 
