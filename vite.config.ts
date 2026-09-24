@@ -10,6 +10,8 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  // host: true = accessible depuis le telephone/emulateur (WebView de l'app VIDO LOVE) sur le reseau local.
+  server: { host: true },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

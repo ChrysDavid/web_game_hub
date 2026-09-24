@@ -9,9 +9,10 @@ import {
   YARD_SLOTS,
   centerOf,
 } from '@/games/ludo/constants'
-import type { LudoGame, Token } from '@/games/ludo/engine'
+import type { Token } from '@/games/ludo/engine'
+import type { LudoGameView } from '@/games/ludo/types'
 
-const props = defineProps<{ game: LudoGame }>()
+const props = defineProps<{ game: LudoGameView }>()
 
 const unit = 100 / GRID_SIZE
 

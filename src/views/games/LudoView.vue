@@ -4,6 +4,12 @@ import { ALL_COLORS, COLOR_HEX, COLOR_LABEL, type PlayerColor } from '@/games/lu
 import { createLudoGame, type LudoGame } from '@/games/ludo/engine'
 import LudoBoard from '@/components/ludo/LudoBoard.vue'
 import LudoDice from '@/components/ludo/LudoDice.vue'
+import LudoOnline from '@/components/ludo/LudoOnline.vue'
+import { getAppSession } from '@/services/appLink'
+
+// Ouvert depuis l'app (ticket dans l'URL) : partie entre vraies personnes.
+// Ouvert directement sur le site : partie contre l'ordinateur, comme avant.
+const appSession = getAppSession()
 
 const phase = ref<'setup' | 'playing'>('setup')
 const count = ref(4)
@@ -45,7 +51,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="ludo-page">
-    <div v-if="phase === 'setup'" class="setup">
+    <LudoOnline v-if="appSession" :session="appSession" />
+
+    <div v-else-if="phase === 'setup'" class="setup">
       <h1>Ludo</h1>
       <p class="hint">Combien de camps ?</p>
       <div class="row">

@@ -119,3 +119,11 @@ composants.
 - [ ] Pont JS jeu ↔ app native (envoi du score de fin de partie)
 - [ ] Filtrage de la galerie par app consommatrice via paramètre d'URL
       (`?app=couple`) plutôt que codé en dur
+
+## Jeux en ligne depuis l'app VIDO LOVE
+
+- Ouvert directement dans un navigateur : on joue contre l'ordinateur.
+- Ouvert depuis l'app (URL avec `?ticket=...&ws=...`) : on joue contre de vraies personnes,
+  via le backend `vidolove_backend` (voir `vidolove_backend/docs/GAMES.md`).
+- Ludo : `src/games/ludo/online.ts` (client en ligne) et `src/components/ludo/LudoOnline.vue`.
+- Le serveur Vite ecoute sur le reseau local (`server.host: true`) pour que le telephone y accede.
