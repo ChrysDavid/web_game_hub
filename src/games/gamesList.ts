@@ -1,4 +1,4 @@
-export type GameCategory = 'couple' | 'orientation'
+export type GameCategory = 'couple' | 'orientation' | 'compatibilite'
 
 export interface GameMeta {
   id: string
@@ -10,6 +10,14 @@ export interface GameMeta {
 }
 
 export const gamesList: GameMeta[] = [
+  {
+    id: 'phase1',
+    title: 'Jeux de compatibilité (phase 1)',
+    thumbnail: '/thumbnails/phase1.jpg',
+    type: '2D',
+    category: 'compatibilite',
+    route: '/jeux/phase1',
+  },
   {
     id: 'ludo',
     title: 'Ludo',
@@ -27,6 +35,14 @@ export const gamesList: GameMeta[] = [
     route: '/jeux/pioche',
   },
   {
+    id: 'action-verite',
+    title: 'Action ou Vérité (phase 2)',
+    thumbnail: '/thumbnails/action-verite.jpg',
+    type: '2D',
+    category: 'couple',
+    route: '/jeux/action-verite',
+  },
+  {
     id: 'refuge',
     title: 'Notre Refuge',
     thumbnail: '/thumbnails/refuge.jpg',
@@ -39,4 +55,5 @@ export const gamesList: GameMeta[] = [
 export const categoryLabels: Record<GameCategory, string> = {
   couple: 'Couple',
   orientation: 'Orientation',
+  compatibilite: 'Compatibilité',
 }
