@@ -4,6 +4,7 @@ import type { PlayerColor } from './constants'
 import { MAX_STEP } from './constants'
 import type { Token } from './engine'
 import type { LudoGameView } from './types'
+import { playSound } from '@/services/sound'
 
 /**
  * Partie de Ludo en ligne entre 2 et 4 vraies personnes (ouverte depuis l'app uniquement).
@@ -193,12 +194,14 @@ export function createOnlineLudoGame(session: AppSession) {
 
   async function animateRoll(value: number) {
     state.rolling = true
+    playSound('diceShake', 0.8)
     for (let i = 0; i < 9; i++) {
       state.dice = Math.floor(Math.random() * 6) + 1
       await wait(55)
     }
     state.dice = value
     state.rolling = false
+    playSound('diceThrow')
     await wait(450)
   }
 
@@ -208,18 +211,24 @@ export function createOnlineLudoGame(session: AppSession) {
     state.moving = true
     if (event.from! < 0) {
       t.step = 0
+      playSound('pawnStep')
       await wait(280)
     } else {
       while (t.step < event.to!) {
         t.step++
+        playSound('pawnStep', 0.45)
         await wait(155)
       }
     }
+    if (t.step === MAX_STEP) playSound('pawnHome')
     for (const c of event.captured ?? []) {
       const captured = findToken(c.color, c.token)
       if (captured) captured.step = -1
     }
-    if (event.captured?.length) await wait(420)
+    if (event.captured?.length) {
+      playSound('pawnCapture')
+      await wait(420)
+    }
     state.moving = false
   }
 

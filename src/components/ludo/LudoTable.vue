@@ -4,6 +4,7 @@ import { COLOR_HEX, type PlayerColor } from '@/games/ludo/constants'
 import type { LudoGameView } from '@/games/ludo/types'
 import LudoBoard from './LudoBoard.vue'
 import LudoDice from './LudoDice.vue'
+import SoundToggle from '@/components/SoundToggle.vue'
 
 /**
  * Table de jeu commune (partie locale contre l'ordinateur et partie en ligne) :
@@ -56,6 +57,7 @@ function roll(color: PlayerColor) {
 
 <template>
   <div class="table">
+    <SoundToggle class="sound" />
     <template v-for="(row, r) in [topPods, bottomPods]" :key="r">
       <div class="pods" :class="r === 0 ? 'pods--top' : 'pods--bottom'">
         <div
@@ -115,6 +117,13 @@ function roll(color: PlayerColor) {
 <style scoped>
 /* Largeur du plateau : toute la largeur sur mobile, sans jamais depasser la hauteur disponible
    (il reste la place des postes des joueurs et du message). */
+.sound {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 30;
+}
+
 .table {
   --board: min(100%, 600px, calc(100dvh - 190px));
   width: var(--board);

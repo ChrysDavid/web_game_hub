@@ -12,10 +12,15 @@ import {
   type PlayerId,
   type Suit,
 } from '@/games/pioche/constants'
-import { createPiocheGame, type PiocheAnimator, type PiocheGame } from '@/games/pioche/engine'
+import { createPiocheGame, type PiocheAnimator } from '@/games/pioche/engine'
+import { createOnlinePiocheGame, type OnlinePiocheGame } from '@/games/pioche/online'
+import type { PiocheTable } from '@/games/pioche/types'
+import { getAppSession, notifyApp } from '@/services/appLink'
 import { discardJitter, handLayout, type CardBox } from '@/games/pioche/flight'
 import PlayingCard from '@/components/pioche/PlayingCard.vue'
 import CardFlights from '@/components/pioche/CardFlights.vue'
+import SoundToggle from '@/components/SoundToggle.vue'
+import { playSound } from '@/services/sound'
 
 // Inclinaison de la table (vue "assis a table") : les cartes posees dessus suivent ce plan.
 const TABLE_TILT = 40
@@ -32,9 +37,14 @@ const SEATS: Record<number, Partial<Record<PlayerId, Seat>>> = {
   3: { o1: { x: 30, y: 24, rot: 95 }, o2: { x: 50, y: 6, rot: 180 }, o3: { x: 70, y: 24, rot: -95 } },
 }
 
-const phase = ref<'setup' | 'playing'>('setup')
+// Ouvert depuis l'app (ticket dans l'URL) : partie en ligne entre vraies personnes, sans ecran de
+// choix. Ouvert directement sur le site : partie contre l'ordinateur.
+const appSession = getAppSession()
+
+const phase = ref<'setup' | 'playing'>(appSession ? 'playing' : 'setup')
 const opponentCount = ref(2)
-const game = shallowRef<PiocheGame | null>(null)
+const game = shallowRef<PiocheTable | null>(null)
+const online = shallowRef<OnlinePiocheGame['online'] | null>(null)
 
 const flights = ref<InstanceType<typeof CardFlights> | null>(null)
 const sceneEl = ref<HTMLElement | null>(null)
@@ -48,9 +58,16 @@ const sceneW = ref(390)
 const suitResolver = ref<((suit: Suit) => void) | null>(null)
 const allowedSuits = ref<Suit[]>(SUITS.slice())
 
-const opponents = computed(() => OPPONENTS.slice(0, opponentCount.value))
+const opponents = computed<PlayerId[]>(() =>
+  game.value ? OPPONENTS.filter((p) => game.value!.state.players.includes(p)) : OPPONENTS.slice(0, opponentCount.value),
+)
 function seatOf(p: PlayerId): Seat {
-  return SEATS[opponentCount.value]?.[p] ?? { x: 50, y: 7, rot: 180 }
+  return SEATS[opponents.value.length]?.[p] ?? { x: 50, y: 7, rot: 180 }
+}
+
+/** Pseudo envoye par le serveur en ligne (jamais le vrai nom), sinon le nom de l'ordinateur. */
+function nameOf(p: PlayerId) {
+  return game.value?.state.names[p] ?? PLAYER_LABEL[p]
 }
 const handCardW = computed(() => Math.round(Math.min(sceneW.value * 0.25, 118)))
 
@@ -61,7 +78,26 @@ function measure() {
 onMounted(() => {
   measure()
   window.addEventListener('resize', measure)
+  if (appSession) {
+    const onlineGame = createOnlinePiocheGame(appSession, animator)
+    game.value = onlineGame
+    online.value = onlineGame.online
+    onlineGame.start()
+  }
 })
+
+const lobbyText = computed(() => {
+  const o = online.value
+  if (!o) return ''
+  if (o.lobbyPlayers < o.minPlayers) return 'On attend au moins un autre joueur…'
+  if (o.startsIn != null) return `La partie commence dans ${o.startsIn} s`
+  return 'La partie va commencer'
+})
+
+function quitToApp() {
+  game.value?.stop()
+  notifyApp('close')
+}
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', measure)
@@ -102,6 +138,8 @@ function discardBox(card: Card): CardBox {
 
 const animator: PiocheAnimator = {
   async draw(p, card, fast) {
+    // Carte qui glisse de la pioche (plus discret pendant la distribution, ou les cartes s'enchainent).
+    playSound('cardSlide', fast ? 0.5 : 0.9)
     await flights.value?.fly({
       card,
       from: boxOf(drawTopEl.value, { tilt: TABLE_TILT }),
@@ -113,6 +151,7 @@ const animator: PiocheAnimator = {
     })
   },
   async play(p, card, detach) {
+    playSound('cardSlide', 0.6)
     const from = p === 'me' ? handCardBox(card) : seatBox(p)
     detach()
     await flights.value?.fly({
@@ -124,8 +163,10 @@ const animator: PiocheAnimator = {
       duration: 600,
       lift: p === 'me' ? 90 : 50,
     })
+    playSound('cardPlace')
   },
   async reshuffle(cards) {
+    playSound('cardShuffle')
     // Quelques cartes du talon volent vers la pioche en se retournant (pas les 40 : trop lourd).
     const shown = cards.slice(-6)
     const to = boxOf(drawPileEl.value, { tilt: TABLE_TILT })
@@ -155,6 +196,7 @@ const animator: PiocheAnimator = {
       duration: 650,
       lift: 60,
     })
+    playSound('cardPlace')
   },
   chooseSuit(allowed) {
     allowedSuits.value = allowed
@@ -171,6 +213,7 @@ function startGame() {
   handCardEls.clear()
   game.value = createPiocheGame(['me', ...opponents.value], { animator })
   phase.value = 'playing'
+  playSound('cardShuffle')
   // Laisse la table s'afficher avant la distribution (les positions doivent exister).
   requestAnimationFrame(() => void game.value?.start())
 }
@@ -198,6 +241,7 @@ function onHandCard(card: Card) {
     return
   }
   clearTimeout(rejectTimer)
+  playSound('cardShove', 0.7)
   rejectedId.value = null
   requestAnimationFrame(() => {
     rejectedId.value = card.id
@@ -239,7 +283,7 @@ const suitChanged = computed(() => {
 const winnerTitle = computed(() => {
   const winner = game.value?.state.winner
   if (!winner) return ''
-  return winner === 'me' ? 'Bravo, tu as gagné !' : `${PLAYER_LABEL[winner]} a gagné`
+  return winner === 'me' ? 'Bravo, tu as gagné !' : `${nameOf(winner)} a gagné`
 })
 
 function handStyle(i: number, n: number) {
@@ -257,8 +301,10 @@ function fanStyle(i: number, n: number) {
 <template>
   <div ref="sceneEl" class="scene" :style="{ '--hand-w': `${handCardW}px` }">
     <div class="wall" />
+    <SoundToggle class="sound" />
 
-    <RouterLink to="/" class="back" aria-label="Retour aux jeux">‹</RouterLink>
+    <button v-if="appSession" class="back" aria-label="Quitter la partie" @click="quitToApp">‹</button>
+    <RouterLink v-else to="/" class="back" aria-label="Retour aux jeux">‹</RouterLink>
 
     <!-- Choix de la table -->
     <div v-if="phase === 'setup'" class="setup">
@@ -298,8 +344,8 @@ function fanStyle(i: number, n: number) {
           :class="{ 'badge--active': game.current.value === p && game.state.phase === 'playing' }"
           :style="{ '--c': PLAYER_COLOR[p] }"
         >
-          <span class="avatar">{{ PLAYER_LABEL[p][0] }}</span>
-          <span class="name">{{ PLAYER_LABEL[p] }}</span>
+          <span class="avatar">{{ nameOf(p)[0] }}</span>
+          <span class="name">{{ nameOf(p) }}</span>
           <span class="count">{{ game.state.hands[p].length }}</span>
           <span v-if="game.current.value === p && game.state.phase === 'playing'" class="thinking">
             <i /><i /><i />
@@ -376,6 +422,9 @@ function fanStyle(i: number, n: number) {
           >↻</span
         >
         <span v-if="game.state.message" class="message">{{ game.state.message }}</span>
+        <span v-if="online?.secondsLeft != null && game.state.phase === 'playing'" class="timer"
+          >{{ online.secondsLeft }} s</span
+        >
         <button v-if="game.canPass.value" class="pass-btn" @click="game.pass()">Passer</button>
       </div>
 
@@ -430,16 +479,46 @@ function fanStyle(i: number, n: number) {
           <ol class="ranking">
             <li v-for="(p, i) in game.ranking.value" :key="p">
               <span class="place">{{ i + 1 }}</span>
-              <span class="mini-avatar" :style="{ background: PLAYER_COLOR[p] }">{{ PLAYER_LABEL[p][0] }}</span>
-              <span class="rank-name">{{ PLAYER_LABEL[p] }}</span>
+              <span class="mini-avatar" :style="{ background: PLAYER_COLOR[p] }">{{ nameOf(p)[0] }}</span>
+              <span class="rank-name">{{ nameOf(p) }}</span>
               <span class="rank-left">{{ game.state.hands[p].length }} carte{{ game.state.hands[p].length > 1 ? 's' : '' }}</span>
             </li>
           </ol>
-          <button class="play-btn" @click="startGame">Rejouer</button>
-          <button class="link-btn" @click="backToSetup">Changer de table</button>
+          <template v-if="appSession">
+            <button class="play-btn" @click="notifyApp('replay')">Rejouer</button>
+            <button class="link-btn" @click="notifyApp('close')">Quitter</button>
+          </template>
+          <template v-else>
+            <button class="play-btn" @click="startGame">Rejouer</button>
+            <button class="link-btn" @click="backToSetup">Changer de table</button>
+          </template>
         </div>
       </div>
     </template>
+
+    <!-- Partie en ligne : connexion et salon d'attente (vraies personnes, 2 a 4) -->
+    <div v-if="online && ['connecting', 'lobby', 'error'].includes(online.phase)" class="overlay overlay--lobby">
+      <div class="panel">
+        <h2>8 américain</h2>
+        <template v-if="online.phase === 'connecting'">
+          <p class="lobby-text">Connexion au salon…</p>
+        </template>
+        <template v-else-if="online.phase === 'lobby'">
+          <div class="lobby-seats">
+            <span
+              v-for="i in online.maxPlayers"
+              :key="i"
+              class="lobby-seat"
+              :class="{ 'lobby-seat--filled': i <= online.lobbyPlayers }"
+            />
+          </div>
+          <p class="lobby-count">{{ online.lobbyPlayers }} / {{ online.maxPlayers }} joueurs</p>
+          <p class="lobby-text">{{ lobbyText }}</p>
+        </template>
+        <p v-else class="lobby-text">{{ online.error }}</p>
+        <button class="link-btn" @click="quitToApp">Quitter</button>
+      </div>
+    </div>
 
     <CardFlights ref="flights" />
   </div>
@@ -454,6 +533,8 @@ function fanStyle(i: number, n: number) {
   height: 100dvh;
   margin: 0 auto;
   overflow: hidden;
+  /* clip : la scene ne peut jamais defiler, meme quand un element recoit le focus. */
+  overflow: clip;
   background: #3a2414;
   font-family: 'Segoe UI', system-ui, sans-serif;
   touch-action: manipulation;
@@ -468,6 +549,13 @@ function fanStyle(i: number, n: number) {
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(60, 35, 15, 0.35) 100%),
     repeating-linear-gradient(90deg, #f1e7d2 0 22px, #e6d8bb 22px 25px, #f6eedd 25px 44px, #ddcdae 44px 46px);
+}
+
+.sound {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 30;
 }
 
 .back {
@@ -485,6 +573,8 @@ function fanStyle(i: number, n: number) {
   font-size: 28px;
   line-height: 1;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
@@ -587,7 +677,7 @@ function fanStyle(i: number, n: number) {
   position: absolute;
   top: 12px;
   left: 60px;
-  right: 12px;
+  right: 60px;
   display: flex;
   justify-content: center;
   gap: 8px;
@@ -769,6 +859,53 @@ function fanStyle(i: number, n: number) {
 
 .call-btn--done {
   background: #2e9e57;
+}
+
+.timer {
+  min-width: 40px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  background: rgba(20, 10, 4, 0.55);
+  color: #ffd35c;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.overlay--lobby {
+  z-index: 45;
+}
+
+.lobby-seats {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.lobby-seat {
+  width: 44px;
+  height: 62px;
+  border-radius: 6px;
+  border: 2px dashed #c9b894;
+}
+
+.lobby-seat--filled {
+  border: 3px solid #fbf8f1;
+  background: linear-gradient(160deg, #2c56b8, #183a86);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  animation: pop 0.3s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.lobby-count {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.lobby-text {
+  margin: 6px 0 14px;
+  color: #5a4535;
+  font-size: 14px;
 }
 
 .pass-btn {

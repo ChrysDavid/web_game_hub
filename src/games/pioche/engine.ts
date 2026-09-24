@@ -86,6 +86,7 @@ export function createPiocheGame(players: PlayerId[], options: PiocheOptions = {
 
   const state = reactive({
     players,
+    names: Object.fromEntries(players.map((p) => [p, PLAYER_LABEL[p]])) as Partial<Record<PlayerId, string>>,
     hands: Object.fromEntries(players.map((p) => [p, [] as Card[]])) as Record<PlayerId, Card[]>,
     drawPile: [] as Card[],
     discardPile: [] as Card[],

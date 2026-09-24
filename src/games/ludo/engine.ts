@@ -1,6 +1,7 @@
 import { reactive, computed } from 'vue'
 import type { PlayerColor } from './constants'
 import { COLOR_LABEL, LAST_TRACK_STEP, MAX_STEP, SAFE_INDICES, trackIndex } from './constants'
+import { playSound } from '@/services/sound'
 
 export interface Token {
   color: PlayerColor
@@ -165,18 +166,24 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
 
     if (t.step < 0) {
       t.step = 0
+      playSound('pawnStep')
       await wait(280)
     } else {
       for (let i = 0; i < d; i++) {
         t.step++
+        playSound('pawnStep', 0.45)
         await wait(155)
       }
     }
 
     const captured = resolveCapture(t)
-    if (captured) await wait(420)
+    if (captured) {
+      playSound('pawnCapture')
+      await wait(420)
+    }
 
     const reachedHome = t.step === MAX_STEP
+    if (reachedHome) playSound('pawnHome')
     if (reachedHome) state.message = `${COLOR_LABEL[t.color]} rentre un pion`
 
     if (hasFinished(t.color) && !state.ranking.includes(t.color)) {
@@ -207,12 +214,14 @@ export function createLudoGame(players: PlayerColor[], bots: PlayerColor[]) {
 
     state.rolling = true
     state.message = ''
+    playSound('diceShake', 0.8)
     for (let i = 0; i < 9; i++) {
       state.dice = Math.floor(Math.random() * 6) + 1
       await wait(55)
     }
     state.dice = Math.floor(Math.random() * 6) + 1
     state.rolling = false
+    playSound('diceThrow')
 
     state.sixStreak = state.dice === 6 ? state.sixStreak + 1 : 0
 
